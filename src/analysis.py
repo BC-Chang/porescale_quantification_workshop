@@ -34,14 +34,14 @@ class ImageQuantifier:
 
     def run_analysis(self, heterogeneity_kwargs={}, ev_kwargs={}, write_results=True, save_path=None, to_file_kwargs={}):
         mf = self.get_quantimpy_mf()
-        vf = self.heterogeneity_analysis(**heterogeneity_kwargs)
+        # vf = self.heterogeneity_analysis(**heterogeneity_kwargs)
         interval = self.find_porosity_visualization_interval(**ev_kwargs)
 
         if save_path is None:
             save_path = os.path.dirname(self.datapath)
         if write_results:
             utils.write_results(mf, 'minkowski', directory_path=save_path, **to_file_kwargs)
-            utils.write_results(vf, 'heterogeneity', directory_path=save_path, **to_file_kwargs)
+            # utils.write_results(vf, 'heterogeneity', directory_path=save_path, **to_file_kwargs)
             utils.write_results(interval, 'subsets', directory_path=save_path, **to_file_kwargs)
 
 
@@ -81,7 +81,7 @@ class ImageQuantifier:
 
         return vf_df
 
-    def find_porosity_visualization_interval(self, cube_size=100, batch=100, **kwargs):
+    def find_porosity_visualization_interval(self, cube_size=256, batch=100, **kwargs):
         """
         Finds the best cubic interval for visualizing the segmented dataset.
 
@@ -91,9 +91,9 @@ class ImageQuantifier:
 
         scalar_data = deepcopy(self.image)
 
-        scalar_data[scalar_data == 0] = 199
-        scalar_data[scalar_data != 199] = 0
-        scalar_data[scalar_data == 199] = 1
+        # scalar_data[scalar_data == 0] = 199
+        # scalar_data[scalar_data != 199] = 0
+        # scalar_data[scalar_data == 199] = 1
 
         size = scalar_data.shape[0] * scalar_data.shape[1] * scalar_data.shape[2]
         porosity = (scalar_data == 1).sum() / size
@@ -118,9 +118,9 @@ class ImageQuantifier:
             mini = np.random.randint(low=0, high=max_dim - sample_size)
             maxi = mini + sample_size
 
+
             scalar_boot = scalar_data[mini:maxi, mini:maxi, mini:maxi]
             scalar_boot_inner = scalar_data[mini + inc:maxi - inc, mini + inc:maxi - inc, mini + inc:maxi - inc]
-
             scalar_boot_flat = scalar_boot.ravel()
             scalar_boot_inner_flat = scalar_boot_inner.ravel()
 
