@@ -1,0 +1,58 @@
+Domain {
+   Filename = "segmented_bead_pack_512.ubc.morphdrain.raw"
+   voxel_length = 17.4
+   N = 256, 256, 256
+   n = 256, 256, 256
+   nproc = 1, 1, 1
+   ReadType ="8bit"
+   // key values set by image labeling 
+   ReadValues = 0, 1, 2 
+   WriteValues = 0, 1, 2 
+   // keys below set by color model
+   BC = 0
+   InletLayers = 0, 0, 5 
+   OutletLayers = 0, 0, 5 
+   Sw = 0.3
+}
+Color {
+   ComponentLabels = 0, 
+   ComponentAffinity = 0.9, 
+   WettingConvention = "SCAL"
+   protocol = "fractional flow"
+   rhoA = 1.0
+   rhoB = 1.0
+   tauA = 0.7
+   tauB = 0.7
+   alpha = 0.008
+   beta = 0.95
+   F = 0.0, 0.0, 1e-05
+   capillary_number = 1e-04
+   timestepMax = 10000000
+}
+Analysis {
+   subphase_analysis_interval= 5000
+   analysis_interval = 1000
+   restart_interval = 10000000
+   restart_file = "Restart"
+}
+Visualization {
+   write_silo = true
+   save_8bit_raw = true
+   save_phase_field = true
+   save_pressure = false
+   save_velocity = false
+   visualization_interval = 5000000
+}
+FlowAdaptor {
+   min_steady_timesteps = 50000      // timestep floor (per steady point)
+   max_steady_timesteps = 100000     // timestep ceiling (per steady point)
+   mass_fraction_factor = 0.006      // controls the rate of mass seeding in adaptive step
+   fractional_flow_increment = 0.1   // saturation change after each steady point
+   endpoint_threshold = 0.1          // endpoint exit criterion (based on flow rates)
+}
+MRT { 
+   timestepMax = 20000
+   tau = 0.7
+   F = 0.0, 0.0, 1.0e-5
+   tolerance = 0.01
+}
