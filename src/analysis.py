@@ -120,7 +120,7 @@ class ImageQuantifier:
 
 
             scalar_boot = scalar_data[mini:maxi, mini:maxi, mini:maxi]
-            scalar_boot_inner = scalar_data[mini + inc:maxi - inc, mini + inc:maxi - inc, mini + inc:maxi - inc]
+            scalar_boot_inner = scalar_data[mini + inc//2:maxi - inc//2, mini + inc//2:maxi - inc//2, mini + inc//2:maxi - inc//2]
             scalar_boot_flat = scalar_boot.ravel()
             scalar_boot_inner_flat = scalar_boot_inner.ravel()
 
@@ -152,10 +152,10 @@ class ImageQuantifier:
                 stats_array[4, i] = scipy.stats.hmean([stats_array[0, i],
                                                        stats_array[1, i]])
                 i += 1
-
+                # break
             else:
                 continue
-
+        print(stats_array[4, :])
         best_index = np.argmax(stats_array[4, :])
         best_interval = int(stats_array[3, best_index])
 
