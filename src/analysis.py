@@ -6,6 +6,8 @@ import scipy
 from src import utils
 import os
 import pandas as pd
+import tqdm
+import torch.nn
 
 # Morphology/Topology analysis packages
 from quantimpy import minkowski as mk
@@ -13,6 +15,11 @@ from quantimpy import minkowski as mk
 # Heterogeneity analysis packages
 from src.Vsi import Vsi, rock_type
 from scipy.ndimage import distance_transform_edt as dst
+import edt
+import scipy
+import concurrent.futures
+import multiprocessing as mp
+
 
 
 class ImageQuantifier:
@@ -20,6 +27,7 @@ class ImageQuantifier:
         self.datapath = datapath
         self.image = utils.read_tiff(self.datapath)
         self.image_name = os.path.splitext(os.path.basename(self.datapath))[0]
+        self.porosity = (self.image == 1).sum() / self.image.size
 
     def plot_slice(self, slice_num=None):
 
@@ -75,91 +83,44 @@ class ImageQuantifier:
         vf = Vsi(self.image,
                  min_radius=mn_r, max_radius=mx_r, **kwargs)
         vf_df = vf.result()
-        heterogeneity_ratio = vf.rock_type()
-        vf_df.insert(0, 'Name', self.image_name, allow_duplicates=True)
-        vf_df.insert(3, 'Heterogeneity Ratio', heterogeneity_ratio, allow_duplicates=True)
+        # heterogeneity_ratio = vf.rock_type()
+        # vf_df.insert(0, 'Name', self.image_name, allow_duplicates=True)
+        # vf_df.insert(3, 'Heterogeneity Ratio', heterogeneity_ratio, allow_duplicates=True)
 
         return vf_df
 
-    def find_porosity_visualization_interval(self, cube_size=100, batch=100, **kwargs):
+    def find_interval(self, cube_size=100, batch=100, **kwargs):
         """
         Finds the best cubic interval for visualizing the segmented dataset.
 
         cube_size: Size of the visualization cube, default is 100 (100x100x100).
         batch: Batch over which to calculate the stats, default is 100.
         """
-
+        np.random.seed(1589061)
         scalar_data = deepcopy(self.image)
 
-        scalar_data[scalar_data == 0] = 199
-        scalar_data[scalar_data != 199] = 0
-        scalar_data[scalar_data == 199] = 1
 
-        size = scalar_data.shape[0] * scalar_data.shape[1] * scalar_data.shape[2]
-        porosity = (scalar_data == 1).sum() / size
-
-        sample_size = cube_size
 
         # Inner cube increment
-        inc = sample_size - int(sample_size * 0.5)
+        inc = (cube_size - int(cube_size * 0.5)) // 2
 
         # One dimension of the given vector sample cube.
         max_dim = len(scalar_data)
 
-        batch_for_stats = max_dim - sample_size  # Max possible batch number
+        stats_array = np.zeros(shape=(5, batch))
 
-        # Or overwrite:
-        batch_for_stats = batch
-
-        stats_array = np.zeros(shape=(5, batch_for_stats))
-
-        i = 0
-        while i < batch_for_stats:
-            mini = np.random.randint(low=0, high=max_dim - sample_size)
-            maxi = mini + sample_size
-
-            scalar_boot = scalar_data[mini:maxi, mini:maxi, mini:maxi]
-            scalar_boot_inner = scalar_data[mini + inc:maxi - inc, mini + inc:maxi - inc, mini + inc:maxi - inc]
-
-            scalar_boot_flat = scalar_boot.ravel()
-            scalar_boot_inner_flat = scalar_boot_inner.ravel()
-
-            labels_out_outside, N = cc3d.largest_k(
-                scalar_boot, k=1,
-                connectivity=26, delta=0,
-                return_N=True,
-            )
-
-            index_outside, counts_outside = np.unique(labels_out_outside, return_counts=True)
-            counts_outside_sum = np.sum(counts_outside[1:])
-
-            labels_out_inside, N = cc3d.largest_k(
-                scalar_boot_inner, k=1,
-                connectivity=26, delta=0,
-                return_N=True,
-            )
-
-            index_inside, counts_inside = np.unique(labels_out_inside, return_counts=True)
-            counts_inside_sum = np.sum(counts_inside[1:])
-
-            porosity_selected = (scalar_boot == 1).sum() / sample_size ** 3
-
-            if (porosity_selected <= porosity * 1.2) & (porosity_selected >= porosity * 0.8):
-                stats_array[0, i] = counts_outside_sum
-                stats_array[1, i] = counts_inside_sum
-                stats_array[2, i] = porosity_selected
-                stats_array[3, i] = mini
-                stats_array[4, i] = scipy.stats.hmean([stats_array[0, i],
-                                                       stats_array[1, i]])
-                i += 1
-
-            else:
-                continue
+        with concurrent.futures.ProcessPoolExecutor(max_workers=mp.cpu_count()) as executor:
+            for i in range(stats_array.shape[0]):
+                stats_array[:, i] = executor.submit(self._get_stats_array,
+                                                    image=scalar_data,
+                                                    max_dim=max_dim,
+                                                    cube_size=cube_size,
+                                                    inc=inc, iteration=i).result()
 
         best_index = np.argmax(stats_array[4, :])
         best_interval = int(stats_array[3, best_index])
 
-        print(f'Original Porosity: {round(porosity * 100, 2)} %\n' +
+        print(f'Original Porosity: {round(self.porosity * 100, 2)} %\n' +
               f'Subset Porosity: {round(stats_array[2, best_index] * 100, 2)} %\n' +
               f'Competent Interval: [{best_interval}:{best_interval + cube_size},' +
               f'{best_interval}:{best_interval + cube_size},{best_interval}:{best_interval + cube_size}]')
@@ -171,3 +132,49 @@ class ImageQuantifier:
                                   'subset_end': [best_interval[1]]})
 
         return subset_df
+
+    def _get_stats_array(self, image: np.ndarray, max_dim: int, cube_size: int, inc: int, iteration: int) -> tuple:
+        """
+        Get the stats array for subset extraction
+        Returns: np.ndarray of array stats
+        """
+        # Set a random seed
+        np.random.seed(iteration*1742809)
+        while True:
+            mini = np.random.randint(low=0, high=max_dim - cube_size)
+            maxi = mini + cube_size
+
+            scalar_boot = image[mini:maxi, mini:maxi, mini:maxi]
+            scalar_boot_inner = image[mini + inc:maxi - inc, mini + inc:maxi - inc, mini + inc:maxi - inc]
+
+            labels_out_outside, _ = cc3d.largest_k(
+                scalar_boot, k=1,
+                connectivity=26, delta=0,
+                return_N=True,
+            )
+
+            index_outside, counts_outside = np.unique(labels_out_outside, return_counts=True)
+            counts_outside_sum = np.sum(counts_outside[1:])
+
+            labels_out_inside, _ = cc3d.largest_k(
+                scalar_boot_inner, k=1,
+                connectivity=26, delta=0,
+                return_N=True,
+            )
+
+            index_inside, counts_inside = np.unique(labels_out_inside, return_counts=True)
+            counts_inside_sum = np.sum(counts_inside[1:])
+
+            porosity_selected = (scalar_boot == 1).sum() / cube_size ** 3
+
+            if (porosity_selected <= self.porosity * 1.2) & (porosity_selected >= self.porosity * 0.8):
+                harmonic_mean_metric = scipy.stats.hmean([counts_outside_sum, counts_inside_sum])
+                return counts_outside_sum, counts_inside_sum, porosity_selected, mini, harmonic_mean_metric
+
+
+
+
+
+
+
+
