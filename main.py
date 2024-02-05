@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from src import utils
 from src.analysis import ImageQuantifier
+from src import find_interval
 import pandas as pd
 from src.Vsi_new import Vsi
 import time
@@ -18,7 +19,12 @@ if __name__ == "__main__":
         subset_df = img.find_interval(cube_size=256)
         end = time.perf_counter_ns()
         print(f"Process took {(end - start)*1e-9:.5f}s")
-        print(subset_df.head())
+
+
+        start = time.perf_counter_ns()
+        subset_df = find_interval.find_interval(image=img.image, cube_size=256)
+        end = time.perf_counter_ns()
+        print(f"Process took {(end - start)*1e-9:.5f}s")
         # img.plot_slice()
     #     img.run_analysis(heterogeneity_kwargs={'no_radii': 20, 'no_samples_per_radius': 500}, ev_kwargs={'cube_size': 256},
     #                     to_file_kwargs={'filetype': 'parquet'})

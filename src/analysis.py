@@ -121,7 +121,6 @@ class ImageQuantifier:
         #                                             inc=inc, iteration=i).result()
         for i in range(batch):
             stats_array[i] = self._get_stats_array(max_dim=max_dim, cube_size=cube_size, inc=inc, iteration=i)
-        print(stats_array)
         best_index = np.argmax(stats_array[:, 4])
         best_interval = int(stats_array[best_index, 3])
 
