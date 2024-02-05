@@ -7,7 +7,6 @@ from src import utils
 import os
 import pandas as pd
 import tqdm
-import torch.nn
 
 # Morphology/Topology analysis packages
 from quantimpy import minkowski as mk
@@ -16,7 +15,7 @@ from quantimpy import minkowski as mk
 from src.Vsi import Vsi, rock_type
 from scipy.ndimage import distance_transform_edt as dst
 import edt
-import scipy
+import scipy.stats
 import concurrent.futures
 import multiprocessing as mp
 
